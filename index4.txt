@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài Tập Sắp Xếp Câu Tiếng Trung Online</title>
+    <!-- Thư viện Pinyin -->
+    <script src="https://unpkg.com/pinyin-pro"></script>
+    <!-- Thư viện nén dữ liệu chuẩn -->
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --error: #dc2626;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #f1f5f9; color: #0f172a; display: flex; min-height: 100vh; }
+
+        /* SIDEBAR CHO GIÁO VIÊN */
+        .sidebar {
+            width: 420px; background: #ffffff; padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1); overflow-y: auto;
+            height: 100vh; position: fixed; left: 0; top: 0; z-index: 10;
+        }
+
+        .sidebar h2 {
+            font-size: 1.1rem; color: var(--primary); margin-bottom: 12px;
+            padding-bottom: 6px; border-bottom: 2px solid var(--primary);
+        }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 5px; }
+        .form-group textarea {
+            width: 100%; height: 110px; padding: 8px; border: 1px solid #cbd5e1;
+            border-radius: 4px; resize: vertical; font-size: 13px;
+        }
+        .form-group select, .form-group input[type="text"] {
+            width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px;
+        }
+
+        .btn {
+            width: 100%; padding: 10px; background-color: var(--primary); color: white;
+            border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
+            margin-top: 6px; font-size: 13px; transition: background 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-parse { background-color: #0284c7; }
+        .btn-share { background-color: #7c3aed; }
+        .btn-submit { background-color: #16a34a; font-size: 16px; padding: 12px; }
+
+        /* BẢNG TỪ VỰNG */
+        .parsed-table-container {
+            max-height: 200px; overflow-y: auto; border: 1px solid #cbd5e1;
+            margin: 10px 0; border-radius: 4px;
+        }
+
+        .parsed-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .parsed-table th, .parsed-table td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; }
+        .parsed-table th { background: #f1f5f9; position: sticky; top: 0; }
+        .parsed-table input { width: 100%; border: none; outline: none; background: transparent; font-size: 12px; }
+
+        .btn-del-row { color: #ef4444; cursor: pointer; font-weight: bold; text-align: center; }
+
+        /* KHU VỰC BÀI TẬP (HỌC SINH LÀM BÀI) */
+        .workspace { margin-left: 420px; flex: 1; padding: 30px; max-width: 900px; }
+        .exercise-card {
+            background: #ffffff; border-radius: 8px; padding: 20px;
+            margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
+        }
+        .exercise-header { font-weight: bold; font-size: 1rem; margin-bottom: 15px; color: #334155; display: flex; align-items: center; gap: 8px; }
+        .q-number { background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+
+        .word-pool {
+            display: flex; flex-wrap: wrap; gap: 10px; padding: 12px;
+            background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; min-height: 60px; margin-bottom: 15px;
+        }
+        .answer-zone {
+            display: flex; flex-wrap: wrap; gap: 10px; padding: 12px;
+            background: #ffffff; border: 2px solid #2563eb; border-radius: 6px; min-height: 65px; align-items: center;
+        }
+
+        .word-chip {
+            display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #ffffff; border: 1px solid #94a3b8; border-radius: 6px;
+            padding: 6px 12px; cursor: grab; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: all 0.2s ease;
+        }
+        .word-chip:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .word-chip:active { cursor: grabbing; }
+
+        .chip-pinyin { font-size: 11px; color: #2563eb; font-weight: 600; margin-bottom: 2px; }
+        .chip-hanzi { font-size: 20px; font-weight: bold; color: #0f172a; }
+
+        .word-chip.correct { background-color: #dcfce7 !important; border-color: var(--success) !important; }
+        .word-chip.correct .chip-hanzi { color: #15803d; }
+        .word-chip.incorrect { background-color: #fee2e2 !important; border-color: var(--error) !important; }
+        .word-chip.incorrect .chip-hanzi { color: #b91c1c; }
+
+        .correct-answer-box {
+            margin-top: 12px; padding: 10px; background: #eff6ff;
+            border-left: 4px solid var(--primary); border-radius: 4px; font-size: 14px; display: none;
+        }
+
+        /* GIAO DIỆN HỌC SINH: TỰ ĐỘNG ẨN SIDEBAR CỦA GIÁO VIÊN */
+        body.student-mode .sidebar { display: none !important; }
+        body.student-mode .workspace { margin-left: 0 !important; max-width: 800px; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+    <!-- CÔNG CỤ TẠO ĐỀ CHO GIÁO VIÊN -->
+    <div class="sidebar">
+        <h2>Công Cụ Tạo Bài Tập Tiếng Trung</h2>
+
+        <div class="form-group">
+            <label for="rawSentences">Dán các câu tiếng Trung vào đây:</label>
+            <textarea id="rawSentences" placeholder="Dán văn bản tiếng Trung vào đây..."></textarea>
+        </div>
+
+        <button class="btn btn-parse" onclick="parseSentences()">⚡ 1. Phân Tách Từ Ghép & Pinyin</button>
+
+        <div class="parsed-table-container">
+            <table class="parsed-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Câu</th>
+                        <th style="width: 35%;">Từ ghép</th>
+                        <th style="width: 35%;">Pinyin</th>
+                        <th style="width: 15%;">Xóa</th>
+                    </tr>
+                </thead>
+                <tbody id="parsedTbody"></tbody>
+            </table>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+            <label for="showPinyinOpt">Hiển thị Pinyin:</label>
+            <select id="showPinyinOpt">
+                <option value="true" selected>Hiện Pinyin trên từ ghép</option>
+                <option value="false">Ẩn Pinyin (Chỉ hiện chữ Hán)</option>
+            </select>
+        </div>
+
+        <button class="btn" onclick="buildExercises()">✨ 2. Xem Trước Bài Tập</button>
+        <button class="btn btn-share" onclick="generateShareLink()">🔗 3. Lấy Link Chia Sẻ Học Sinh</button>
+    </div>
+
+    <!-- MÀN HÌNH LÀM BÀI CHO HỌC SINH -->
+    <div class="workspace">
+        <h1 style="margin-bottom: 20px; font-size: 1.5rem;">Bài Tập Sắp Xếp Câu Tiếng Trung</h1>
+        <div id="exerciseContainer"></div>
+        <button class="btn btn-submit" id="btnSubmit" style="display:none;" onclick="gradeExercise()">✅ Nộp Bài / Hoàn Thành</button>
+    </div>
+
+    <script>
+        const defaultText = `花园里有一只漂亮的蝴蝶\n消灭所有怪物后才能过关\n我不瞒你说，这件事情.`;
+
+        function segmentChineseText(text) {
+            if (text.includes('|')) {
+                return text.split('|').map(w => w.trim()).filter(w => w.length > 0);
+            }
+            if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });
+                const segments = segmenter.segment(text);
+                const results = [];
+                for (const segment of segments) {
+                    const word = segment.segment.trim();
+                    if (word && word !== ' ') {
+                        results.push(word);
+                    }
+                }
+                return results;
+            }
+            return text.split('').filter(c => c.trim() !== '');
+        }
+
+        function getPinyin(text) {
+            try {
+                if (typeof pinyinPro !== 'undefined' && pinyinPro.pinyin) {
+                    return pinyinPro.pinyin(text, { toneType: 'symbol' });
+                }
+            } catch (e) {}
+            return '';
+        }
+
+        function parseSentences() {
+            const raw = document.getElementById('rawSentences').value.trim();
+            if (!raw) return alert("Vui lòng nhập danh sách câu!");
+
+            const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            const tbody = document.getElementById('parsedTbody');
+            tbody.innerHTML = '';
+
+            lines.forEach((line, qIdx) => {
+                const words = segmentChineseText(line);
+                words.forEach((word) => {
+                    const py = getPinyin(word);
+                    addRowToParsedTable(qIdx, word, py);
+                });
+            });
+
+            buildExercises();
+        }
+
+        function addRowToParsedTable(qIdx, word, py) {
+            const tbody = document.getElementById('parsedTbody');
+            const tr = document.createElement('tr');
+            tr.dataset.qidx = qIdx;
+            tr.innerHTML = `
+                <td><b>Câu ${qIdx + 1}</b></td>
+                <td><input type="text" class="edit-hanzi" value="${word}"></td>
+                <td><input type="text" class="edit-pinyin" value="${py}"></td>
+                <td class="btn-del-row" onclick="this.closest('tr').remove()">✕</td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function getParsedData() {
+            const rows = document.querySelectorAll('#parsedTbody tr');
+            const questionsDict = {};
+
+            rows.forEach(tr => {
+                const qIdx = tr.dataset.qidx;
+                const hanzi = tr.querySelector('.edit-hanzi').value.trim();
+                const pinyin = tr.querySelector('.edit-pinyin').value.trim();
+
+                if (!questionsDict[qIdx]) questionsDict[qIdx] = [];
+                if (hanzi) {
+                    questionsDict[qIdx].push({ hanzi, pinyin });
+                }
+            });
+
+            return Object.values(questionsDict);
+        }
+
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function buildExercises() {
+            const questions = getParsedData();
+            if (questions.length === 0) return;
+
+            const showPinyin = document.getElementById('showPinyinOpt').value === 'true';
+            const container = document.getElementById('exerciseContainer');
+            container.innerHTML = '';
+
+            questions.forEach((qWords, qIdx) => {
+                const card = document.createElement('div');
+                card.className = 'exercise-card';
+
+                const shuffled = shuffleArray(qWords.map((item, id) => ({ ...item, originalId: id })));
+
+                card.innerHTML = `
+                    <div class="exercise-header">
+                        <span class="q-number">Câu ${qIdx + 1}</span> Sắp xếp các từ thành câu hoàn chỉnh:
+                    </div>
+                    <div class="word-pool" id="pool-${qIdx}" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+                    <div class="answer-zone" id="answer-${qIdx}" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+                    <div class="correct-answer-box" id="correct-ans-${qIdx}">
+                        <b>Đáp án đúng:</b> ${qWords.map(w => w.hanzi).join(' ')}
+                    </div>
+                `;
+
+                container.appendChild(card);
+
+                const pool = card.querySelector(`#pool-${qIdx}`);
+                shuffled.forEach((item) => {
+                    const chip = createWordChip(item, qIdx, showPinyin);
+                    pool.appendChild(chip);
+                });
+            });
+
+            document.getElementById('btnSubmit').style.display = 'block';
+        }
+
+        function createWordChip(item, qIdx, showPinyin) {
+            const chip = document.createElement('div');
+            chip.className = 'word-chip';
+            chip.draggable = true;
+            chip.dataset.hanzi = item.hanzi;
+            chip.dataset.pinyin = item.pinyin;
+
+            chip.innerHTML = `
+                ${showPinyin && item.pinyin ? `<span class="chip-pinyin">${item.pinyin}</span>` : ''}
+                <span class="chip-hanzi">${item.hanzi}</span>
+            `;
+
+            chip.ondragstart = (e) => { window.draggedElement = chip; };
+
+            chip.onclick = () => {
+                const pool = document.getElementById(`pool-${qIdx}`);
+                const answer = document.getElementById(`answer-${qIdx}`);
+                if (chip.parentElement === pool) {
+                    answer.appendChild(chip);
+                } else {
+                    pool.appendChild(chip);
+                }
+            };
+
+            return chip;
+        }
+
+        function allowDrop(e) { e.preventDefault(); }
+        function drop(e) {
+            e.preventDefault();
+            if (window.draggedElement) {
+                e.currentTarget.appendChild(window.draggedElement);
+                window.draggedElement = null;
+            }
+        }
+
+        function gradeExercise() {
+            const questions = getParsedData();
+
+            questions.forEach((qWords, qIdx) => {
+                const answerZone = document.getElementById(`answer-${qIdx}`);
+                const userChips = answerZone.querySelectorAll('.word-chip');
+                const correctBox = document.getElementById(`correct-ans-${qIdx}`);
+
+                userChips.forEach((chip, idx) => {
+                    const expectedHanzi = qWords[idx] ? qWords[idx].hanzi : null;
+                    const actualHanzi = chip.dataset.hanzi;
+
+                    chip.classList.remove('correct', 'incorrect');
+                    if (actualHanzi === expectedHanzi) {
+                        chip.classList.add('correct');
+                    } else {
+                        chip.classList.add('incorrect');
+                    }
+                });
+
+                correctBox.style.display = 'block';
+            });
+        }
+
+        function generateShareLink() {
+            const questions = getParsedData();
+            const showPinyin = document.getElementById('showPinyinOpt').value;
+
+            if (questions.length === 0) return alert("Chưa có dữ liệu bài tập!");
+
+            const payload = { questions, showPinyin };
+
+            if (typeof LZString !== 'undefined') {
+                const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
+                const baseUrl = window.location.origin + window.location.pathname;
+                const studentUrl = `${baseUrl}?z=${compressed}&s=1`;
+
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(studentUrl).then(() => {
+                        alert("✅ ĐÃ SAO CHÉP LINK BÀI TẬP BÀI HỌC SINH!\n\nLink này hoạt động vĩnh viễn, học sinh mở ra sẽ làm bài trực tiếp.");
+                    });
+                } else {
+                    prompt("Sao chép link bài tập:", studentUrl);
+                }
+            }
+        }
+
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const compressed = urlParams.get('z');
+            const isStudent = urlParams.get('s') === '1';
+
+            if (isStudent) {
+                document.body.classList.add('student-mode');
+            }
+
+            if (compressed && typeof LZString !== 'undefined') {
+                try {
+                    const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
+                    if (decompressed) {
+                        const data = JSON.parse(decompressed);
+                        document.getElementById('showPinyinOpt').value = data.showPinyin;
+
+                        const tbody = document.getElementById('parsedTbody');
+                        tbody.innerHTML = '';
+                        data.questions.forEach((qWords, qIdx) => {
+                            qWords.forEach(w => {
+                                addRowToParsedTable(qIdx, w.hanzi, w.pinyin);
+                            });
+                        });
+                        buildExercises();
+                    }
+                } catch (e) {
+                    console.error("Lỗi giải nén dữ liệu:", e);
+                }
+            } else {
+                document.getElementById('rawSentences').value = defaultText;
+                parseSentences();
+            }
+        };
+    </script>
+</body>
+</html>
